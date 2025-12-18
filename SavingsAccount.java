@@ -22,4 +22,5 @@ public class SavingsAccount extends BankAccount {
         transactions.add(new Transaction("WITHDRAW", amount, LocalDateTime.now()));
         return true;
     }
+    
 }
