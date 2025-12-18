@@ -4,37 +4,30 @@ import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.PriorityQueue;
+import java.util.Comparator;
 
 public class BankSystem {
     
-    // لتمثيل جميع العملاء والحسابات
+    // تخزين العملاء والحسابات باستخدام الخرائط (Maps) لسرعة الوصول
     private final Map<String, Customer> customers;
     private final Map<String, BankAccount> accounts;
-    private final Random random;
     
-    // متغير لتوليد ID العميل (تسلسلي)
-    private int nextCustomerId=1; 
-    
-    // =========================================================
-    // **التعديل الجديد: متغير لتوليد رقم الحساب التسلسلي**
-    // يبدأ من 10 أرقام (يمكنك تغيير هذا الرقم البادئ)
-   
-    // =========================================================
-
+    // قائمة انتظار الخدمة ذات الأولوية
+    private final PriorityQueue<ServiceRequest> serviceQueue;
 
     public BankSystem() {
         this.customers = new HashMap<>();
         this.accounts = new HashMap<>();
-        this.random = new Random();
         
-        // أمثلة مبدئية لضمان عدم ظهور قوائم فارغة عند التشغيل الأول
-       
-        
-        // يجب إضافة حسابات اختبار هنا إذا لزم الأمر
+        // تهيئة قائمة الخدمة لترتيب الطلبات حسب الأولوية (الرقم الأصغر أولاً)
+        this.serviceQueue = new PriorityQueue<>(
+            Comparator.comparingInt(ServiceRequest::getPriority)
+        );
     }
-    
+
     // =========================================================
-    // CUSTOMER MANAGEMENT FUNCTIONS
+    // إدارة العملاء (Customer Management)
     // =========================================================
 
     public void addCustomer(Customer customer) {
@@ -49,24 +42,31 @@ public class BankSystem {
         return customers.containsKey(customerId);
     }
     
-    // دالة مساعدة مطلوبة لعرض العملاء في الجدول والكومبوبوكس
     public Map<String, Customer> getCustomers() {
         return customers;
     }
 
-    public String generateUniqueCustomerId() {
-        String newId;
-        do {
-            // توليد تسلسلي لـ ID العميل
-            newId = String.valueOf(nextCustomerId++);
-        } while (customers.containsKey(newId));
-        return newId;
+    /**
+     * توليد ID تلقائي للعميل يبدأ بـ TR متبوعاً بـ 24 رقماً منسقاً
+     */
+    public String generateAutomaticID() {
+        Random random = new Random();
+        StringBuilder sb = new StringBuilder("TR");
+        
+        for (int i = 0; i < 24; i++) {
+            sb.append(random.nextInt(10));
+            // إضافة مسافة كل 4 أرقام لتسهيل القراءة (مثل IBAN)
+            if ((i + 1) % 4 == 0 && i < 23) {
+                sb.append(" ");
+            }
+        }
+        return sb.toString();
     }
-    
+
     // =========================================================
-    // ACCOUNT GENERATION AND MANAGEMENT FUNCTIONS
+    // إدارة الحسابات (Account Management)
     // =========================================================
-    
+
     public void addAccount(BankAccount account) {
         accounts.put(account.getAccountNumber(), account);
     }
@@ -78,14 +78,25 @@ public class BankSystem {
     public boolean accountExists(String accNum) {
         return accounts.containsKey(accNum);
     }
-    
+
     /**
-     * توليد رقم حساب فريد (تسلسلي) مع التحقق من عدم تكراره.
+     * إرجاع كافة الحسابات (مهم لنافذة البحث والـ Browse)
      */
-   
-    
+    public Map<String, BankAccount> getAllAccounts() {
+        return accounts;
+    }
+
+    /**
+     * توليد رقم حساب عشوائي يبدأ بـ 25 مع 4 أرقام إضافية
+     */
+    public String generateRandomAccountNumber() {
+        Random random = new Random();
+        int suffix = random.nextInt(10000); 
+        return "25" + String.format("%04d", suffix);
+    }
+
     // =========================================================
-    // TRANSACTION AND SERVICE FUNCTIONS
+    // العمليات المالية (Transactions)
     // =========================================================
 
     public boolean transfer(String fromAccNum, String toAccNum, BigDecimal amount) {
@@ -96,31 +107,27 @@ public class BankSystem {
             return false;
         }
 
-        // منطق التحويل: السحب أولاً، ثم الإيداع
+        // تنفيذ عملية السحب من المرسل ثم الإيداع للمستقبل
         if (fromAcc.withdraw(amount)) {
             toAcc.deposit(amount);
             return true;
         }
         return false;
     }
-    
-    // دالة وهمية لتمثيل إضافة طلب خدمة (للتوافق مع MenuGUI)
+
+    // =========================================================
+    // قائمة انتظار الخدمة (Service Queue)
+    // =========================================================
+
     public void addServiceRequest(ServiceRequest request) {
-        System.out.println("Service Request Added: " + request.getIssue());
-    }
-    
-    // دالة وهمية لتمثيل خدمة الطلب التالي
-    public ServiceRequest serveNextRequest() {
-        return new ServiceRequest("0000", "Simulated Service", 1); // إرجاع طلب وهمي
-    }
-    
-    // دالة وهمية للتحقق من وجود طلبات
-    public boolean hasRequests() {
-        return true; 
+        serviceQueue.add(request);
     }
 
-	public String generateUniqueAccountNumber() {
-		// TODO Auto-generated method stub
-		return null;
-	}
+    public ServiceRequest serveNextRequest() {
+        return serviceQueue.poll();
+    }
+
+    public boolean hasRequests() {
+        return !serviceQueue.isEmpty();
+    }
 }
